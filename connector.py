@@ -93,7 +93,7 @@ class ConnectorSterling:
                 else:
                     break
             except Exception as e:
-                print(f"Exception initializing sterling {e}")
+                print(f"Exception initializing sterling {e} at try #{tries}")
                 tries+=1
         if tries==3:
             self.conn=None
