@@ -6,9 +6,9 @@
 # LOSS OF INFORMATION OR OTHER PECUNIARY LOSS) THAT MAY RESULT FROM THE USE OF OR INABILITY TO USE THE CODE,
 # EVEN IF I HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
-
+STERLING_CONNECTOR_INIT_MAX_TRIES=3
 import datetime, clr, sys, os
-
+import time
 sys.path.append(os.path.dirname(__file__))
 clr.AddReference('SterlingWrapper')
 from SterlingWrapper import Connector
@@ -50,9 +50,54 @@ class StiPosition:
 
 class ConnectorSterling:
     __slots__ = ['conn', '_verbose']
-
-    def __init__(self, verbose=True):
-        self.conn = Connector()
+    DATE = '240927' #format to today
+    ACCOUNT = 'ACCOUNT_NUMBER'
+    def __init__(self, verbose=True)
+        option_type = 'C'
+        strike = 15
+        quantity = 1
+        contract = dict(
+             side='B',
+             symbol='',
+             account=ACCOUNT,
+             tif='D', # D for day
+             quantity=quantity,
+             destination='SENSOR', # 'SENSOR' live, 'CBOE' demo, # used to be 'VTRDOPT'
+             lmt_price=0.05,
+             open_close='O',
+             maturity=f'20{DATE}',
+             put_call=option_type,
+             underlying='SPXW',
+             cover_uncover='U',
+             instrument='O',
+             strike=15,
+             symbol = f'SPXW {DATE}{option_type}{strike}000',
+             strike = strike,
+         )
+        tries=0
+        while tries<STERLING_CONNECTOR_INIT_MAX_TRIES:
+            try:
+                self.conn = Connector()
+                sleep(0.5)
+                #try dummy order
+                status=0
+                order_id=0
+                # place the order
+                order_id, status = self.conn.send_option_limit( # pass the dictionary to the send_option_limit function
+                 **contract
+                 )
+                time.sleep(2)
+                status=self.conn.order_status(order_id)
+                if status==0:
+                    tries+=1
+                else:
+                    break
+            except Exception as e:
+                print(f"Exception initializing sterling {e}")
+                tries+=1
+        if tries==3:
+            self.conn=None
+            raise ValueError(f"Valid connection wasn't established in {STERLING_CONNECTOR_INIT_MAX_TRIES} attempts.")
         self._verbose = verbose
 
     def send_market(self, account, symbol, size, route, side, tif='D') -> tuple:
