@@ -1,5 +1,6 @@
 from copy import copy
 import time
+import sys
 from connector import ConnectorSterling
 
 # hardcode the account
@@ -87,8 +88,12 @@ def buy_option(con: ConnectorSterling, amount: int, option_type: str, strike: in
 
 
 if __name__ == "__main__":
-
-    con = ConnectorSterling(verbose=False)
+    try:
+        con = ConnectorSterling(verbose=False)
+    except Exception as e:
+        print(f"Error: {e}")
+        print("Exiting program as all tries have been used. Check sterling app and other connections.")
+        sys.exit(1)
     
     # buy amount options to buy
     amount = 1
