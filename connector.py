@@ -1,4 +1,4 @@
-# You will use this code on your own risk
+ror-# You will use this code on your own risk
 # I EXPRESSLY DISCLAIMS ALL REPRESENTATIONS AND WARRANTIES, EXPRESS OR IMPLIED, WITH RESPECT TO THE CODE,
 # INCLUDING THE WARRANTIES OF MERCHANTABILITY AND OF FITNESS FOR A PARTICULAR PURPOSE.
 # UNDER NO CIRCUMSTANCES INCLUDING NEGLIGENCE SHALL I BE LIABLE FOR ANY DAMAGES, INCIDENTAL, SPECIAL,
@@ -147,7 +147,7 @@ class ConnectorSterling:
                 tries+=1
             if tries>=3:
                 raise ValueError(f"Order was not submitted after #{SUBMIT_OPTION_LIMIT_MAX_TRIES} of tries, with error codes: {error_codes}")
-        return id_, status
+        return id_, error_code
 
     def send_stop_limit(self, account, symbol, size, stop_price, limit_price, route, side, tif='D', disp=0) -> tuple:
         """Place stop limit order. Return orderID and status (check Sterling API docs)"""
