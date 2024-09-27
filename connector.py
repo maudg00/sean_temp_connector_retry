@@ -7,11 +7,15 @@
 # EVEN IF I HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
 STERLING_CONNECTOR_INIT_MAX_TRIES=3
+SUBMIT_OPTION_LIMIT_MAX_TRIES=3
 import datetime, clr, sys, os
 import time
 sys.path.append(os.path.dirname(__file__))
 clr.AddReference('SterlingWrapper')
 from SterlingWrapper import Connector
+
+DATE = '240927' #format to today
+ACCOUNT = 'asdf'
 
 
 class PositionParsingException(Exception):
@@ -51,14 +55,13 @@ class StiPosition:
 class ConnectorSterling:
     __slots__ = ['conn', '_verbose']
     DATE = '240927' #format to today
-    ACCOUNT = 'ACCOUNT_NUMBER'
-    def __init__(self, verbose=True)
+    ACCOUNT = 'T3T3GRHA'
+    def __init__(self, verbose=True):
         option_type = 'C'
         strike = 15
         quantity = 1
         contract = dict(
              side='B',
-             symbol='',
              account=ACCOUNT,
              tif='D', # D for day
              quantity=quantity,
@@ -70,7 +73,6 @@ class ConnectorSterling:
              underlying='SPXW',
              cover_uncover='U',
              instrument='O',
-             strike=15,
              symbol = f'SPXW {DATE}{option_type}{strike}000',
              strike = strike,
          )
@@ -78,24 +80,28 @@ class ConnectorSterling:
         while tries<STERLING_CONNECTOR_INIT_MAX_TRIES:
             try:
                 self.conn = Connector()
-                sleep(0.5)
+                time.sleep(0.5)
                 #try dummy order
                 status=0
                 order_id=0
                 # place the order
-                order_id, status = self.conn.send_option_limit( # pass the dictionary to the send_option_limit function
+                order_id, submit_status = self.send_option_limit( # pass the dictionary to the send_option_limit function
                  **contract
                  )
-                time.sleep(2)
-                status=self.conn.order_status(order_id)
-                if status==0:
+                if submit_status!=0:
+                    print(f"submit error status: {submit_status}")
                     tries+=1
                 else:
-                    break
+                    time.sleep(2)
+                    status=self.order_status(order_id)
+                    if status==0:
+                        tries+=1
+                    else:
+                        break
             except Exception as e:
                 print(f"Exception initializing sterling {e} at try #{tries}")
                 tries+=1
-        if tries==3:
+        if tries>=3:
             self.conn=None
             raise ValueError(f"Valid connection wasn't established in {STERLING_CONNECTOR_INIT_MAX_TRIES} attempts.")
         self._verbose = verbose
@@ -115,9 +121,33 @@ class ConnectorSterling:
 
     def send_option_limit(self, side: str, symbol: str, account: str, tif: str, quantity: int, destination: str, lmt_price: float, open_close: str, maturity: str, put_call: str, underlying: str, cover_uncover: str, instrument: str, strike: float) -> tuple:
         """Place a limit order for an option. Return orderID and status (check Sterling API docs)"""
-        res = self.conn.Sendoptionlimit(side, symbol, account, tif, quantity, destination, lmt_price, open_close, maturity, put_call, underlying, cover_uncover, instrument, strike)
-        id_, status = res.split(';')
-        return id_, int(status)
+        error_codes=[]
+        error_code=0
+        tries=0
+        #sometimes connector fails halfway through so we need to reinstance it
+        #if we retry this a certain amount of times and it doesn't work then that means something else
+        #is really wrong: e.g sterling app closed or crashed, or order is wrong. But this mechanism lets us know that so we can
+        #handle it (e.g send email).
+        while tries<SUBMIT_OPTION_LIMIT_MAX_TRIES:
+            try:
+                res = self.conn.Sendoptionlimit(side, symbol, account, tif, quantity, destination, lmt_price, open_close, maturity, put_call, underlying, cover_uncover, instrument, strike)
+                id_, error_code = res.split(';')
+                error_code=int(error_code)
+                if error_code!=0:
+                    error_codes.append(error_code)
+                    #reinstance connector and try again
+                    tries+=1
+                    self.conn=Connector()
+                    print(f"Error code in submit at try #{tries+1}")
+                else:
+                    break
+            except Exception as e:
+                print(f"Exception sending order: {e}")
+                error_codes.append(f"Error was exception {e}")
+                tries+=1
+            if tries>=3:
+                raise ValueError(f"Order was not submitted after #{SUBMIT_OPTION_LIMIT_MAX_TRIES} of tries, with error codes: {error_codes}")
+        return id_, status
 
     def send_stop_limit(self, account, symbol, size, stop_price, limit_price, route, side, tif='D', disp=0) -> tuple:
         """Place stop limit order. Return orderID and status (check Sterling API docs)"""
