@@ -51,10 +51,14 @@ def buy_option(con: ConnectorSterling, amount: int, option_type: str, strike: in
         contract['quantity'] = quantity
 
         # place the order
-        ordId, status = con.send_option_limit( # pass the dictionary to the send_option_limit function
+        try:
+            ordId, error_code = con.send_option_limit( # pass the dictionary to the send_option_limit function
                             **contract
                             )
-
+        except Exception as e:
+            #decide how to handle e.g send email or other
+            print("Error submitting order: {e}\n")
+        
         # wait 5 seconds for the order to fill
         for _ in range(5):
             order_status = con.order_status(ordId)
